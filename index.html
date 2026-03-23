@@ -7,152 +7,137 @@
   <meta name="description" content="Paste text to generate a QR code (PNG/SVG). Client-only.">
   <meta name="theme-color" content="#0ea5e9" />
 
-  <!-- PWA links (safe even without SW) -->
-  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
-  <link rel="manifest" href="manifest.webmanifest" />
+  <!-- Optional: icons/manifest (safe even without SW) -->
+  <link rel="icon" href="favicon.svg">
+  <link rel="manifest" href="manifest.webmanifest">
 
-  <!-- Tailwind CSS (CDN) - styling only; if this fails, app still works -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = { darkMode: 'class' };
-  </script>
-
+  <!-- Tiny CSS (no CDN) -->
   <style>
     :root { color-scheme: light dark; }
+    body { margin: 0; font: 16px/1.5 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji"; background: #f8fafc; color: #0f172a; }
+    .container { max-width: 56rem; margin: 0 auto; padding: 2rem 1rem; }
+    h1 { margin: 0 0 .25rem; font-size: 1.75rem; font-weight: 600; }
+    .muted { color: #64748b; font-size: .9rem; }
+    .card { background: #fff; border-radius: 1rem; box-shadow: 0 10px 20px rgba(2,6,23,.06); padding: 1rem; margin-top: 1rem; }
+    label { display: block; font-size: .9rem; margin: .5rem 0; }
+    textarea { width: 100%; height: 12rem; border: 1px solid #cbd5e1; border-radius: .75rem; padding: .75rem; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono","Courier New", monospace; background: #fff; color: #0f172a; }
+    input, select, button { font: inherit; }
+    .row { display: grid; gap: .75rem; grid-template-columns: repeat(2, minmax(0,1fr)); }
+    @media (min-width: 700px) { .row { grid-template-columns: repeat(3, minmax(0,1fr)); } }
+    .field { display: grid; gap: .25rem; }
+    .input, .select { width: 100%; border: 1px solid #cbd5e1; border-radius: .75rem; padding: .5rem .65rem; background: #fff; color: #0f172a; }
+    .color { height: 2.25rem; }
+    .actions { display: flex; gap: .5rem; flex-wrap: wrap; padding-top: .5rem; }
+    .btn { padding: .6rem 1rem; border-radius: .75rem; border: 0; cursor: pointer; }
+    .btn.primary { background: #2563eb; color: #fff; }
+    .btn.primary:disabled { opacity: .6; cursor: not-allowed; }
+    .btn.gray { background: #e2e8f0; color: #0f172a; }
+    .preview { display: grid; place-items: center; min-height: 260px; background: #f1f5f9; border-radius: .75rem; padding: 1rem; }
     .qr-preview { image-rendering: pixelated; }
-    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono","Courier New", monospace; }
   </style>
+
+  <!-- Load the QR library from your own repository (no CDN) -->
+  <script src="qrcode.min.js"></script>
 </head>
-<body class="min-h-screen bg-gray-50 text-gray-900">
-  <main class="max-w-3xl mx-auto px-4 py-8">
-    <header class="mb-6">
-      <h1 class="text-2xl sm:text-3xl font-semibold tracking-tight">QR from Text</h1>
-      <p class="text-sm sm:text-base text-gray-600 mt-1">
-        Paste text and generate a QR you can download or copy. <span class="text-xs">v<span id="appVersion">1.2.3-core</span></span>
-      </p>
-      <p id="libStatus" class="text-xs mt-2 text-amber-600">Loading QR library…</p>
+<body>
+  <main class="container">
+    <header>
+      <h1>QR from Text</h1>
+      <p class="muted">Paste text and generate a QR you can download or copy. <span class="muted">v<span id="appVersion">1.2.4-local</span></span></p>
+      <p id="libStatus" class="muted">QR library: <span id="libState">checking…</span></p>
     </header>
 
-    <section class="bg-white rounded-2xl shadow p-4 sm:p-6 space-y-4">
-      <div>
-        <label for="text" class="block text-sm font-medium mb-2">Text to encode</label>
-        <textarea id="text" class="mono w-full h-40 sm:h-48 rounded-xl border border-gray-300 bg-white p-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          placeholder="Paste your text here (URLs, JSON, Wi‑Fi strings, vCard, etc.)"></textarea>
-        <div class="mt-3 flex flex-wrap gap-2">
-          <button id="btnClear" class="px-3 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-sm">Clear</button>
-        </div>
+    <section class="card">
+      <label for="text">Text to encode</label>
+      <textarea id="text" placeholder="Paste your text here (URLs, JSON, Wi‑Fi strings, vCard, etc.)"></textarea>
+      <div class="actions">
+        <button id="btnClear" class="btn gray" type="button">Clear</button>
       </div>
 
-      <div class="grid grid-cols-2 sm:grid-cols-3 gap-4">
-        <div>
-          <label class="block text-sm mb-1">Output</label>
-          <select id="outType" class="w-full rounded-xl border border-gray-300 bg-white p-2">
+      <div class="row" style="margin-top:.5rem">
+        <div class="field">
+          <label>Output</label>
+          <select id="outType" class="select">
             <option value="png">PNG (Canvas)</option>
             <option value="svg">SVG (Vector)</option>
           </select>
         </div>
-        <div>
-          <label class="block text-sm mb-1">Error correction</label>
-          <select id="ecLevel" class="w-full rounded-xl border border-gray-300 bg-white p-2">
+        <div class="field">
+          <label>Error correction</label>
+          <select id="ecLevel" class="select">
             <option value="L">L (Low)</option>
             <option value="M" selected>M (Medium)</option>
             <option value="Q">Q (Quartile)</option>
             <option value="H">H (High)</option>
           </select>
         </div>
-        <div>
-          <label class="block text-sm mb-1">Margin (modules)</label>
-          <input id="margin" type="number" min="0" max="8" value="2"
-            class="w-full rounded-xl border border-gray-300 bg-white p-2" />
+        <div class="field">
+          <label>Margin (modules)</label>
+          <input id="margin" type="number" min="0" max="8" value="2" class="input" />
         </div>
-        <div>
-          <label class="block text-sm mb-1">Scale (px/module)</label>
-          <input id="scale" type="number" min="2" max="20" value="8"
-            class="w-full rounded-xl border border-gray-300 bg-white p-2" />
+        <div class="field">
+          <label>Scale (px/module)</label>
+          <input id="scale" type="number" min="2" max="20" value="8" class="input" />
         </div>
-        <div>
-          <label class="block text-sm mb-1">Foreground</label>
-          <input id="fgColor" type="color" value="#000000"
-            class="w-full h-10 rounded-xl border border-gray-300 bg-white p-1" />
+        <div class="field">
+          <label>Foreground</label>
+          <input id="fgColor" type="color" value="#000000" class="input color" />
         </div>
-        <div>
-          <label class="block text-sm mb-1">Background</label>
-          <input id="bgColor" type="color" value="#ffffff"
-            class="w-full h-10 rounded-xl border border-gray-300 bg-white p-1" />
+        <div class="field">
+          <label>Background</label>
+          <input id="bgColor" type="color" value="#ffffff" class="input color" />
         </div>
       </div>
 
-      <div class="flex flex-wrap gap-2 pt-2">
-        <button id="btnGenerate" class="px-4 py-2 rounded-xl bg-blue-600 text-white opacity-60 cursor-not-allowed" disabled>Generate QR</button>
-        <button id="btnDownload" class="px-4 py-2 rounded-xl bg-gray-100 hover:bg-gray-200">Download</button>
-        <button id="btnCopyImage" class="px-4 py-2 rounded-xl bg-gray-100 hover:bg-gray-200">Copy image</button>
+      <div class="actions">
+        <button id="btnGenerate" class="btn primary" type="button" disabled>Generate QR</button>
+        <button id="btnDownload" class="btn gray" type="button">Download</button>
+        <button id="btnCopyImage" class="btn gray" type="button">Copy image</button>
       </div>
     </section>
 
-    <section class="bg-white rounded-2xl shadow p-4 sm:p-6 mt-6">
-      <h2 class="text-lg font-medium mb-4">Preview</h2>
-      <div id="preview" class="flex items-center justify-center p-4 bg-gray-50 rounded-xl min-h-[260px]">
+    <section class="card" style="margin-top:1rem">
+      <h2 style="margin:0 0 .75rem; font-size:1.1rem">Preview</h2>
+      <div id="preview" class="preview">
         <!-- Canvas/SVG inserted here -->
       </div>
-      <p class="text-xs text-gray-500 mt-3">
-        Tip: Use error correction <strong>H</strong> and margin 2–4 for stickers/print; prefer <strong>SVG</strong> for design/print.
+      <p class="muted" style="margin-top:.5rem">
+        Tip: Use error correction <b>H</b> and margin 2–4 for stickers/print; prefer <b>SVG</b> for design/print.
       </p>
     </section>
   </main>
 
-  <!-- Robust loader: try jsDelivr, then unpkg -->
   <script>
-    (function loadQRLib(urls) {
-      const status = document.getElementById('libStatus');
-      function tryNext() {
-        const url = urls.shift();
-        if (!url) {
-          status.textContent = 'Failed to load QR library. Your network may block CDNs.';
-          status.className = 'text-xs mt-2 text-red-600';
-          return;
-        }
-        const s = document.createElement('script');
-        s.src = url;
-        s.async = true;
-        s.onload = () => {
-          status.textContent = 'QR library loaded.';
-          status.className = 'text-xs mt-2 text-green-600';
-          // enable Generate button
-          const btn = document.getElementById('btnGenerate');
-          btn.disabled = false;
-          btn.classList.remove('opacity-60','cursor-not-allowed');
-          btn.classList.add('hover:bg-blue-700');
-        };
-        s.onerror = () => {
-          status.textContent = `Retrying alternate CDN…`;
-          tryNext();
-        };
-        document.head.appendChild(s);
-      }
-      tryNext();
-    })([
-      'https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js',
-      'https://unpkg.com/qrcode@1.5.3/build/qrcode.min.js'
-    ]);
-  </script>
-
-  <!-- Core page logic -->
-  <script>
-    // If a previous SW is controlling the page, gracefully unregister so cache can't serve stale HTML
+    // If an older service worker exists from previous versions, unregister it to prevent cached HTML
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.getRegistrations().then(regs => regs.forEach(r => r.unregister()));
     }
 
-    const el = (id) => document.getElementById(id);
-    const text = el('text'), outType = el('outType'), ecLevel = el('ecLevel'), margin = el('margin'),
-          scale = el('scale'), fgColor = el('fgColor'), bgColor = el('bgColor'),
-          preview = el('preview'), btnGenerate = el('btnGenerate'), btnDownload = el('btnDownload'),
-          btnCopyImage = el('btnCopyImage'), btnClear = el('btnClear'), libStatus = el('libStatus');
+    const $ = (id) => document.getElementById(id);
+    const el = {
+      text: $('text'), outType: $('outType'), ecLevel: $('ecLevel'),
+      margin: $('margin'), scale: $('scale'), fgColor: $('fgColor'), bgColor: $('bgColor'),
+      btnGenerate: $('btnGenerate'), btnDownload: $('btnDownload'), btnCopyImage: $('btnCopyImage'),
+      btnClear: $('btnClear'), preview: $('preview'), libState: $('libState')
+    };
 
     let currentBlob = null, currentFilename = 'qr';
 
+    function setLibState(ok) {
+      if (ok) {
+        el.libState.textContent = 'loaded from local file';
+        el.btnGenerate.disabled = false;
+      } else {
+        el.libState.textContent = 'NOT loaded (qrcode.min.js missing)';
+        el.btnGenerate.disabled = true;
+      }
+    }
+
+    // Check library
+    setLibState(typeof QRCode !== 'undefined');
+
     function clearPreview() {
-      preview.innerHTML = '';
+      el.preview.innerHTML = '';
       if (currentBlob) URL.revokeObjectURL(currentBlob);
       currentBlob = null;
     }
@@ -164,54 +149,106 @@
       for (let i=0;i<bytes.length;i++) buf[i] = bytes.charCodeAt(i);
       return new Blob([buf], { type: mime });
     }
-    function filenameSafeBase(textVal, max = 24) {
+    function filenameSafe(textVal, max = 36) {
       const base = (textVal || 'qr').trim().slice(0, max).replace(/\s+/g, '-').replace(/[^-\w]+/g, '');
       return base || 'qr';
     }
 
+    // Build QR using the QRCode.js model and render PNG/SVG ourselves
+    function buildQrModel(value, level) {
+      // Create off-DOM QR to access module matrix
+      const dummy = document.createElement('div');
+      const qr = new QRCode(dummy, {
+        text: value,
+        width: 256,
+        height: 256,
+        correctLevel: (function map(level) {
+          const L = QRCode.CorrectLevel;
+          return { L: L.L, M: L.M, Q: L.Q, H: L.H }[level] || L.M;
+        })(level)
+      });
+      return qr._oQRCode; // QRCodeModel with isDark(r,c) and getModuleCount()
+    }
+
     async function generate() {
-      const value = text.value ?? '';
+      const value = el.text.value ?? '';
       if (!value.length) { alert('Please paste or type some text first.'); return; }
+      if (typeof QRCode === 'undefined') { alert('QR library not available.'); return; }
+
       clearPreview();
 
-      if (typeof QRCode === 'undefined') {
-        alert('QR library failed to load. Check your network and try again.');
-        return;
-      }
+      const ec = el.ecLevel.value || 'M';
+      const margin = Math.max(0, parseInt(el.margin.value || 0, 10));
+      const scale = Math.max(2, parseInt(el.scale.value || 8, 10));
+      const fg = el.fgColor.value || '#000000';
+      const bg = el.bgColor.value || '#ffffff';
+      currentFilename = filenameSafe(value);
 
-      const opts = {
-        errorCorrectionLevel: ecLevel.value || 'M',
-        margin: Math.max(0, parseInt(margin.value || 0, 10)),
-        color: { dark: fgColor.value || '#000000', light: bgColor.value || '#ffffff' },
-        width: undefined,
-        scale: Math.max(2, parseInt(scale.value || 8, 10)),
-      };
-      currentFilename = filenameSafeBase(value);
+      const model = buildQrModel(value, ec);
+      const n = model.getModuleCount();
+      const size = (n + margin * 2) * scale;
 
-      try {
-        if (outType.value === 'png') {
-          const canvas = document.createElement('canvas');
-          canvas.className = 'qr-preview rounded-lg bg-white';
-          preview.appendChild(canvas);
-          await new Promise((res, rej) => QRCode.toCanvas(canvas, value, opts, (err) => err ? rej(err) : res()));
-          currentBlob = dataUrlToBlob(canvas.toDataURL('image/png'));
-        } else {
-          const svgText = await QRCode.toString(value, { ...opts, type: 'svg' });
-          const div = document.createElement('div'); div.innerHTML = svgText;
-          const svg = div.firstElementChild;
-          svg.classList.add('qr-preview'); svg.style.background = 'white'; svg.style.borderRadius = '0.5rem';
-          preview.appendChild(svg);
-          currentBlob = new Blob([svgText], { type: 'image/svg+xml' });
+      if (el.outType.value === 'png') {
+        const canvas = document.createElement('canvas');
+        canvas.width = size; canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        // background
+        ctx.fillStyle = bg; ctx.fillRect(0, 0, size, size);
+        // modules
+        ctx.fillStyle = fg;
+        for (let r = 0; r < n; r++) {
+          for (let c = 0; c < n; c++) {
+            if (model.isDark(r, c)) {
+              ctx.fillRect((c + margin) * scale, (r + margin) * scale, scale, scale);
+            }
+          }
         }
-      } catch (e) {
-        console.error('Generate error', e);
-        alert('Failed to generate the QR. See console for details.');
+        canvas.className = 'qr-preview';
+        el.preview.appendChild(canvas);
+        currentBlob = dataUrlToBlob(canvas.toDataURL('image/png'));
+      } else {
+        // Vector SVG
+        const svgNS = 'http://www.w3.org/2000/svg';
+        const svg = document.createElementNS(svgNS, 'svg');
+        svg.setAttribute('width', size);
+        svg.setAttribute('height', size);
+        svg.setAttribute('viewBox', `0 0 ${size} ${size}`);
+        svg.classList.add('qr-preview');
+
+        // background
+        const bgRect = document.createElementNS(svgNS, 'rect');
+        bgRect.setAttribute('x', '0'); bgRect.setAttribute('y', '0');
+        bgRect.setAttribute('width', String(size)); bgRect.setAttribute('height', String(size));
+        bgRect.setAttribute('fill', bg);
+        svg.appendChild(bgRect);
+
+        // draw modules as rects (vector)
+        const g = document.createElementNS(svgNS, 'g');
+        g.setAttribute('fill', fg);
+        for (let r = 0; r < n; r++) {
+          for (let c = 0; c < n; c++) {
+            if (model.isDark(r, c)) {
+              const x = (c + margin) * scale;
+              const y = (r + margin) * scale;
+              const rect = document.createElementNS(svgNS, 'rect');
+              rect.setAttribute('x', String(x));
+              rect.setAttribute('y', String(y));
+              rect.setAttribute('width', String(scale));
+              rect.setAttribute('height', String(scale));
+              g.appendChild(rect);
+            }
+          }
+        }
+        svg.appendChild(g);
+        el.preview.appendChild(svg);
+        const svgText = new XMLSerializer().serializeToString(svg);
+        currentBlob = new Blob([svgText], { type: 'image/svg+xml' });
       }
     }
 
     function download() {
       if (!currentBlob) return alert('Generate a QR first.');
-      const ext = outType.value === 'png' ? 'png' : 'svg';
+      const ext = el.outType.value === 'png' ? 'png' : 'svg';
       const a = document.createElement('a');
       a.href = URL.createObjectURL(currentBlob);
       a.download = `${currentFilename}.${ext}`;
@@ -225,18 +262,22 @@
       try {
         const item = new ClipboardItem({ [currentBlob.type]: currentBlob });
         await navigator.clipboard.write([item]);
-        btnCopyImage.textContent = 'Copied ✅'; setTimeout(() => btnCopyImage.textContent = 'Copy image', 1500);
+        el.btnCopyImage.textContent = 'Copied ✅'; setTimeout(() => el.btnCopyImage.textContent = 'Copy image', 1500);
       } catch {
         alert('Copy failed. Your browser may require HTTPS or permissions.');
       }
     }
 
     document.addEventListener('DOMContentLoaded', () => {
-      btnGenerate.addEventListener('click', generate);
-      btnDownload.addEventListener('click', download);
-      btnCopyImage.addEventListener('click', copyImage);
-      btnClear.addEventListener('click', () => { text.value=''; clearPreview(); text.focus(); });
+      el.btnGenerate.addEventListener('click', generate);
+      el.btnDownload.addEventListener('click', download);
+      el.btnCopyImage.addEventListener('click', copyImage);
+      el.btnClear.addEventListener('click', () => { el.text.value=''; clearPreview(); el.text.focus(); });
+
+      // Enable Generate if library present
+      if (typeof QRCode !== 'undefined') el.btnGenerate.disabled = false;
     });
   </script>
 </body>
 </html>
+``
