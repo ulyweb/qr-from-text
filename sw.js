@@ -1,5 +1,5 @@
 // sw.js — simple offline-first service worker
-const CACHE_VERSION = 'v1.2.0';
+const CACHE_VERSION = 'v1.2.1';
 const CACHE_NAME = `qr-from-text-${CACHE_VERSION}`;
 
 const ASSETS = [
@@ -51,5 +51,4 @@ self.addEventListener('fetch', (event) => {
 });
 
 self.addEventListener('message', (event) => {
-  if (event.data && event.data.type === 'SKIP_WAITING') self.skipWaiting();
-});
+  if (event.data && event
