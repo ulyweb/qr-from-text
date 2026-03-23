@@ -7,18 +7,15 @@
   <meta name="description" content="Paste text to generate a QR code (PNG/SVG). Client-only.">
   <meta name="theme-color" content="#0ea5e9" />
 
-  <!-- Correct PWA links (safe even without SW) -->
-  <link rel="icon" href="favicon.svg">
-  <link rel="manifest" href="manifest.webmanifest">
+  <!-- PWA links (safe even without SW) -->
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+  <link rel="manifest" href="manifest.webmanifest" />
 
-  <!-- Tailwind CSS (CDN) -->
+  <!-- Tailwind CSS (CDN) - styling only; if this fails, app still works -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = { darkMode: 'class' };
   </script>
-
-  <!-- QR Code generator (CDN) -->
-  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
 
   <style>
     :root { color-scheme: light dark; }
@@ -31,8 +28,9 @@
     <header class="mb-6">
       <h1 class="text-2xl sm:text-3xl font-semibold tracking-tight">QR from Text</h1>
       <p class="text-sm sm:text-base text-gray-600 mt-1">
-        Paste any text below and generate a QR code you can download or copy. (v<span id="appVersion">1.2.2-core</span>)
+        Paste text and generate a QR you can download or copy. <span class="text-xs">v<span id="appVersion">1.2.3-core</span></span>
       </p>
+      <p id="libStatus" class="text-xs mt-2 text-amber-600">Loading QR library…</p>
     </header>
 
     <section class="bg-white rounded-2xl shadow p-4 sm:p-6 space-y-4">
@@ -85,7 +83,7 @@
       </div>
 
       <div class="flex flex-wrap gap-2 pt-2">
-        <button id="btnGenerate" class="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white">Generate QR</button>
+        <button id="btnGenerate" class="px-4 py-2 rounded-xl bg-blue-600 text-white opacity-60 cursor-not-allowed" disabled>Generate QR</button>
         <button id="btnDownload" class="px-4 py-2 rounded-xl bg-gray-100 hover:bg-gray-200">Download</button>
         <button id="btnCopyImage" class="px-4 py-2 rounded-xl bg-gray-100 hover:bg-gray-200">Copy image</button>
       </div>
@@ -102,13 +100,54 @@
     </section>
   </main>
 
+  <!-- Robust loader: try jsDelivr, then unpkg -->
   <script>
-    // Minimal core logic
+    (function loadQRLib(urls) {
+      const status = document.getElementById('libStatus');
+      function tryNext() {
+        const url = urls.shift();
+        if (!url) {
+          status.textContent = 'Failed to load QR library. Your network may block CDNs.';
+          status.className = 'text-xs mt-2 text-red-600';
+          return;
+        }
+        const s = document.createElement('script');
+        s.src = url;
+        s.async = true;
+        s.onload = () => {
+          status.textContent = 'QR library loaded.';
+          status.className = 'text-xs mt-2 text-green-600';
+          // enable Generate button
+          const btn = document.getElementById('btnGenerate');
+          btn.disabled = false;
+          btn.classList.remove('opacity-60','cursor-not-allowed');
+          btn.classList.add('hover:bg-blue-700');
+        };
+        s.onerror = () => {
+          status.textContent = `Retrying alternate CDN…`;
+          tryNext();
+        };
+        document.head.appendChild(s);
+      }
+      tryNext();
+    })([
+      'https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js',
+      'https://unpkg.com/qrcode@1.5.3/build/qrcode.min.js'
+    ]);
+  </script>
+
+  <!-- Core page logic -->
+  <script>
+    // If a previous SW is controlling the page, gracefully unregister so cache can't serve stale HTML
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(regs => regs.forEach(r => r.unregister()));
+    }
+
     const el = (id) => document.getElementById(id);
     const text = el('text'), outType = el('outType'), ecLevel = el('ecLevel'), margin = el('margin'),
           scale = el('scale'), fgColor = el('fgColor'), bgColor = el('bgColor'),
           preview = el('preview'), btnGenerate = el('btnGenerate'), btnDownload = el('btnDownload'),
-          btnCopyImage = el('btnCopyImage'), btnClear = el('btnClear');
+          btnCopyImage = el('btnCopyImage'), btnClear = el('btnClear'), libStatus = el('libStatus');
 
     let currentBlob = null, currentFilename = 'qr';
 
@@ -135,9 +174,7 @@
       if (!value.length) { alert('Please paste or type some text first.'); return; }
       clearPreview();
 
-      // Ensure QRCode library is available
       if (typeof QRCode === 'undefined') {
-        console.error('QRCode library not loaded');
         alert('QR library failed to load. Check your network and try again.');
         return;
       }
@@ -194,7 +231,6 @@
       }
     }
 
-    // Wire up
     document.addEventListener('DOMContentLoaded', () => {
       btnGenerate.addEventListener('click', generate);
       btnDownload.addEventListener('click', download);
