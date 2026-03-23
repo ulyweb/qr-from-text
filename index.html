@@ -5,8 +5,10 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>QR from Text • ulyweb</title>
   <meta name="description" content="Paste text to generate QR (PNG/SVG) or scan QR to text. Works offline.">
-  <link rel="icon" type="image/svg+xml" href="favicon.svg">
-  <link rel="manifest" href="manifest.webmanifest">
+
+  <!-- PWA -->
+  <link rel="icon" href="favicon.svg" />
+  <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#0ea5e9" />
 
   <!-- Tailwind CSS (CDN) -->
@@ -19,8 +21,8 @@
   </script>
 
   <!-- QR Code generator & decoder (CDNs, pinned) -->
-  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js" defer></script>
-  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
 
   <style>
     :root { color-scheme: light dark; }
@@ -227,7 +229,7 @@
 
   <script>
     // ======= App constants & state
-    const APP_VERSION = '1.2.0'; // bump when updating SW cache
+    const APP_VERSION = '1.2.1'; // bump when updating SW cache
     const $ = (id) => document.getElementById(id);
     const el = {
       appVersion: $('appVersion'),
@@ -536,7 +538,6 @@
       if ('serviceWorker' in navigator) {
         try {
           const reg = await navigator.serviceWorker.register('./sw.js');
-          // Listen for updates
           if (reg.waiting) notifyUpdate(reg.waiting);
           reg.addEventListener('updatefound', () => {
             const nw = reg.installing;
