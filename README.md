@@ -2,8 +2,6 @@
 
 A fast, offline-capable, and fully client-side QR code generator and scanner. Built as a single-file static web application, it requires no build steps, no backend servers, and respects your privacy by processing everything directly in your browser.
 
-Perfect for hosting on GitHub Pages or dropping onto any static file server.
-
 ## ✨ Features
 
 ### Generation & Customization
